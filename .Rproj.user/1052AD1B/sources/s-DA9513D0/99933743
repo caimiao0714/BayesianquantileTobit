@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1545874346559.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1093967164",
+    "id" : "99933743",
+    "lastKnownWriteTime" : 1545874492,
+    "last_content_update" : 1545874492301,
+    "path" : "C:/Users/miaocai/Dropbox/BayesianquantileTobit/Bayesian Quantile Tobit regression in Stan.Rmd",
+    "project_path" : "Bayesian Quantile Tobit regression in Stan.Rmd",
+    "properties" : {
+        "cursorPosition" : "102,35",
+        "scrollLine" : "80"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
