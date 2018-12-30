@@ -101,5 +101,9 @@ print(stan_fit)
 
 ```{r data}
 dat = haven::read_dta("data/dat.dta")
+
+dat[1:2, '医院名称']
+
+dat$'医院名称'[1:2]
 ```
 
