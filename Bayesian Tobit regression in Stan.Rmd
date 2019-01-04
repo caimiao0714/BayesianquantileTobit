@@ -18,92 +18,192 @@ output:
 knitr::opts_chunk$set(echo = TRUE, eval =FALSE)
 ```
 
-Linear models for quantiles [http://areshenk-research-notes.com/linear-models-for-quantiles/](http://areshenk-research-notes.com/linear-models-for-quantiles/).
 
 
-# Quantile regression in `brms`
+$$TE = \mathbf{X^{\prime}\beta} + \epsilon \\
+\epsilon \sim N(0, \sigma^2)$$
 
-Here is a solution from R package `brms` [https://github.com/paul-buerkner/brms/issues/168](https://github.com/paul-buerkner/brms/issues/168).
+```{r tobitstan}
+tobitstan = '
+data {
+  int<lower=0>  N0;        
+  int<lower=0>  N1;        
+  vector<lower=0,upper=1>[N0] Y0;  
+  vector<lower=0,upper=1>[N1] Y1;  
+  
+  vector[N0] bed0;
+  vector[N0] occ0;
+  vector[N0] alos0;
+  vector[N0] dnr0;
+  vector[N0] bnr0;
+  vector[N0] oir0;
+  vector[N0] pop0;
+  vector[N0] urban0;
+  vector[N0] HHI_beds0;
+  vector[N0] gdp0;
 
-```{r brms}
-n <- 200
-x <- runif(n = n, min = 0, max = 10)
-y <- 1 + 2 * x + rnorm(n = n, mean = 0, sd = 0.6*x)
-dat <- data.frame(x, y)
-# fit the 20%-quantile
-fit <- brm(bf(y ~ x, quantile = 0.2), data = dat, family = asym_laplace())
-summary(fit)
+  vector[N1] bed1;
+  vector[N1] occ1;
+  vector[N1] alos1;
+  vector[N1] dnr1;
+  vector[N1] bnr1;
+  vector[N1] oir1;
+  vector[N1] pop1;
+  vector[N1] urban1;
+  vector[N1] HHI_beds1;
+  vector[N1] gdp1;
+}
+parameters{
+  real b0;
+  real b1;
+  real b2;
+  real b3;
+  real b4;
+  real b5;
+  real b6;
+  real b7;
+  real b8;
+  real b9;
+  real b10;
+  real<lower=0> sigma;
+}
+model{
+  Y0 ~ normal( b0 + b1*bed0 + b2*occ0 + b3*alos0 + b4*dnr0 + b5*bnr0 + b6*oir0 + b7*pop0 + b8*urban0 + b9*HHI_beds0 + b10*gdp0, sigma);
+  
+  target += normal_lccdf( Y1 | b1*bed1 + b2*occ1 + b3*alos1 + b4*dnr1 + b5*bnr1 + b6*oir1 + b7*pop1 + b8*urban1 + b9*HHI_beds1 + b10*gdp1, sigma );
+  
+  
+  //PRIORS
+  b0 ~ normal(0, 10);
+  b1 ~ normal(0, 10);
+  b2 ~ normal(0, 10);
+  b3 ~ normal(0, 10);
+  b4 ~ normal(0, 10);
+  b5 ~ normal(0, 10);
+  b6 ~ normal(0, 10);
+  b7 ~ normal(0, 10);
+  b8 ~ normal(0, 10);
+  b9 ~ normal(0, 10);
+  b10 ~ normal(0, 10);
+  sigma ~ gamma(1, 1);
+}
+'
 ```
 
 
-
-
-
-# Quantile Regression in `Stan`
-
-The model below converged with 5k iterations in less than 30 seconds. [Github repository](https://github.com/brendan-r/quantile_regression)
-
-Anther one on Stan google groups [https://groups.google.com/forum/#!msg/stan-users/iw5u9wYK2hI/Jz91VqoCBAAJ](https://groups.google.com/forum/#!msg/stan-users/iw5u9wYK2hI/Jz91VqoCBAAJ)
-
-```{r}
+```{r tobitstan}
 library(rstan)
 options(mc.cores = parallel::detectCores())
-scode <- "
-data {
-  int<lower=0> N;
-  real<lower=0, upper=1> p;
-  vector[N] x;
-  vector[N] y;
-}
-parameters {
-  real alpha;
-  real beta;
-  real<lower=0> sigma;
-  vector<lower=0>[N] w;
-}
-transformed parameters {
-  real<lower=0> tau;
-  vector[N] mu;
-  vector[N] me;
-  vector[N] pe;
-  vector[N] pe2;
-  tau <- pow(sigma, -2);
-  mu  <- alpha + beta * x;
-  me  <- (1 - 2 * p) / (p * (1 - p)) * w + mu;
-  pe  <- (p * (1 - p) * tau) ./ (2 * w);
-  
-  for(n in 1:N)
-    pe2[n] <- inv_sqrt(pe[n]);
-}
-model {
-  # Priors
-  alpha ~ normal(0, 2);
-  beta  ~ normal(0, 2);
-  sigma ~ cauchy(0, 2.5);
-  # Data Augmentation
-  w     ~ exponential(tau);
-  
-  # The model
-  y     ~ normal(me, pe2);
-}
-"
-init_fun <- function(){
-  list(alpha = 1 + rnorm(1, 0, 0.2), beta = 2.88 + rnorm(1, 0, 0.2), 
-       sigma = runif(1, 0, 5), w = rexp(N, runif(N, 0, 4)))
-}
-params <- c("alpha", "beta", "sigma")
-stan_fit <- stan(model_code = scode, data = within(data_set, N <- N), 
-                 iter = 5000, verbose = FALSE,
-                 pars = params)
-print(stan_fit)
-```
 
-
-```{r data}
 dat = haven::read_dta("data/dat.dta")
+datC  = dat[dat$TE == 1,]
+datUN = dat[dat$TE != 1,]
 
-dat[1:2, '医院名称']
+scale1 = function(x) return((x - mean(x))/sd(x))
 
-dat$'医院名称'[1:2]
+tdat1 = list(
+  N0 = nrow(datUN),
+  Y0 = datUN$TE,
+  bed0 = scale1(datUN$bed),
+  occ0 = scale1(datUN$occ),
+  alos0 = scale1(datUN$alos),
+  dnr0 = scale1(datUN$dnr), 
+  bnr0 = scale1(datUN$bnr),
+  oir0 = scale1(datUN$oir),
+  pop0 = scale1(datUN$pop),
+  urban0 = scale1(datUN$urban),
+  HHI_beds0 = scale1(datUN$HHI_beds),
+  gdp0 = scale1(datUN$gdp),
+  N1 = nrow(datC),
+  Y1 = datC$TE,
+  bed1 = scale1(datC$bed),
+  occ1 = scale1(datC$occ),
+  alos1 = scale1(datC$alos),
+  dnr1 = scale1(datC$dnr), 
+  bnr1 = scale1(datC$bnr),
+  oir1 = scale1(datC$oir),
+  pop1 = scale1(datC$pop),
+  urban1 = scale1(datC$urban),
+  HHI_beds1 = scale1(datC$HHI_beds),
+  gdp1 = scale1(datC$gdp)
+)
+
+rats_fit <- stan(model_code=tobitstan, model_name="Bayesian Tobit", data=tdat1, iter=5000,warmup = 2500, chains=1, seed = 111, control = list(adapt_delta = 0.99))
+
+rstan::summary(rats_fit)
+shinystan::launch_shinystan(rats_fit)
 ```
+
+```{r brms}
+library(brms)
+library(tidyverse)
+dat = haven::read_dta("data/dat.dta")
+dat$censoring = 0
+dat$censoring[dat$TE == 1] = 1
+
+dat1 = dat %>% 
+  select(TE, censoring, bed, occ, alos, dnr, bnr, oir, pop, urban, HHI_beds, gdp) %>% 
+  mutate_all(as.numeric)
+  
+
+fit1 = brm(bf(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp), data = dat1, chains = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
