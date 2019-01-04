@@ -1,5 +1,5 @@
 ---
-title: "Bayesian Tobit regression in Stan"
+title: "Bayesian Quantile Tobit regression in Stan"
 author: "Miao Cai"
 date: "12/23/2018"
 output:
@@ -9,96 +9,146 @@ output:
     toc_float: true
     number_sections: true
     df_print: paged
-    code_folding: hide
+    code_folding: show
   pdf_document:
     number_sections: yes
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval =FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, cache = TRUE)
+```
+
+You need the following packages to run this Rmarkdown file:
+
+- `tidyverse`
+- `rstan`
+- `brms`
+- `shinystan`
+
+# Overview
+
+$$TE = \mathbf{X^{\prime}\beta} + \epsilon \\
+\epsilon \sim N(0, \sigma^2)$$
+
+The outcome variable is Technical efficiency (TE). It is assumed to be right-censored at 1. I didn't assume it to be interval-censored since the minimum TE value in your data is more than 0, so no data is left-censored although it could be left-censored theoretically.
+
+The explanatory variables are:
+
+1. bed, 
+2. occ, 
+3. alos, 
+4. dnr, 
+5. bnr, 
+6. oir, 
+7. pop, 
+8. urban, 
+9. HHI_beds, 
+10. gdp
+
+```{r DATA}
+library(brms)
+library(dplyr)
+library(shinystan)
+
+dat = readr::read_csv("data/dat.csv")
+
+dat$censoring = 0
+dat$censoring[dat$TE == 1] = 1
+
+dat1 = dat %>% 
+  select(year, id, TE, censoring, bed, occ, alos, dnr, bnr, oir, pop, urban, HHI_beds, gdp) %>% 
+  mutate_all(as.numeric)
+
+isFALSE <- function (x) identical(FALSE, x)
+```
+
+# Bayesian Tobit regression
+
+## Fixed-effects Bayesian Tobit regression
+
+```{r tobit}
+fit1 = brm(
+  TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp, 
+  family = gaussian, data = dat1, 
+  inits = "0", seed = 666, cores = 4,
+  chains = 4, iter = 5000, warmup = 2000)
+
+summary(fit1)
+save(fit1, file = "fit/Fixed-effects Bayesian Tobit regression.Rdata")
+# You can get a matrix of fixef effects coefficients by: 
+# fixef(fit1)
+readr::write_csv(data.frame(fixef(fit1)), "fit/Fixed-effects Bayesian Tobit regression.csv")
+
+# shinystan::launch_shinystan(fit1)
+```
+
+```{r o1, eval=TRUE}
+load("fit/Fixed-effects Bayesian Tobit regression.Rdata")
+print(summary(fit1), digits = 3)
 ```
 
 
-Linear models for quantiles [http://areshenk-research-notes.com/linear-models-for-quantiles/](http://areshenk-research-notes.com/linear-models-for-quantiles/).
+## Bayesian Tobit regression with hospital and year random effects
 
+```{r tobitrandom}
+fit2 = brm(
+  TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), 
+  family = gaussian, data = dat1, 
+  inits = "0", seed = 666, cores = 4,
+  chains = 4, iter = 5000, warmup = 2000
+)
 
-# Quantile regression in `brms`
+summary(fit2)
+save(fit2, file = "fit/Random-effects Bayesian Tobit.Rdata")
+readr::write_csv(data.frame(fixef(fit2)), "fit/Random-effects Bayesian Tobit.csv")
+```
 
-Here is a solution from R package `brms` [https://github.com/paul-buerkner/brms/issues/168](https://github.com/paul-buerkner/brms/issues/168).
-
-```{r brms}
-n <- 200
-x <- runif(n = n, min = 0, max = 10)
-y <- 1 + 2 * x + rnorm(n = n, mean = 0, sd = 0.6*x)
-dat <- data.frame(x, y)
-# fit the 20%-quantile
-fit <- brm(bf(y ~ x, quantile = 0.2), data = dat, family = asym_laplace())
-summary(fit)
+```{r o2, eval=TRUE}
+load("fit/Random-effects Bayesian Tobit.Rdata")
+print(summary(fit2), digits = 3)
 ```
 
 
 
+A few notes:
+
+- If you want to study the underlying `Stan` codes, you can access them by `stancode(fit2)`.
+- If you want to access the priors for this model, you can get them by `get_prior(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), family = gaussian, 
+  data = dat1)`
+- You can use `shinystan::launch_shinystan(fit2)` to explore the posterior  estimates.
 
 
-# Quantile Regression in `Stan`
+# Bayesian quantile Tobit regression
 
-The model below converged with 5k iterations in less than 30 seconds. [Github repository](https://github.com/brendan-r/quantile_regression)
+```{r quantiletobit}
+# the following code took OVERNIGHT to run!!
+for (i in 1:9) {
+  qfit0 = brm(
+  bf(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), quantile = 0.1*i), 
+  family = asym_laplace(), data = dat1, 
+  inits = "0", seed = 666, control = list(max_treedepth = 15), 
+  chains = 1, iter = 4000, warmup = 2000, cores = 4
+)
+  summary(qfit0)
+  save(qfit0, file = paste0("fit/fit0", i,".Rdata"))
+  readr::write_csv(data.frame(fixef(qfit0)), paste0("fit/fit0", i,".csv"))
+}
 
-Anther one on Stan google groups [https://groups.google.com/forum/#!msg/stan-users/iw5u9wYK2hI/Jz91VqoCBAAJ](https://groups.google.com/forum/#!msg/stan-users/iw5u9wYK2hI/Jz91VqoCBAAJ)
+# You can get a matrix of fixef effects coefficients by: 
+# fixef(qfit0)
 
-```{r}
-library(rstan)
-options(mc.cores = parallel::detectCores())
-scode <- "
-data {
-  int<lower=0> N;
-  real<lower=0, upper=1> p;
-  vector[N] x;
-  vector[N] y;
-}
-parameters {
-  real alpha;
-  real beta;
-  real<lower=0> sigma;
-  vector<lower=0>[N] w;
-}
-transformed parameters {
-  real<lower=0> tau;
-  vector[N] mu;
-  vector[N] me;
-  vector[N] pe;
-  vector[N] pe2;
-  tau <- pow(sigma, -2);
-  mu  <- alpha + beta * x;
-  me  <- (1 - 2 * p) / (p * (1 - p)) * w + mu;
-  pe  <- (p * (1 - p) * tau) ./ (2 * w);
-  
-  for(n in 1:N)
-    pe2[n] <- inv_sqrt(pe[n]);
-}
-model {
-  # Priors
-  alpha ~ normal(0, 2);
-  beta  ~ normal(0, 2);
-  sigma ~ cauchy(0, 2.5);
-  # Data Augmentation
-  w     ~ exponential(tau);
-  
-  # The model
-  y     ~ normal(me, pe2);
-}
-"
-init_fun <- function(){
-  list(alpha = 1 + rnorm(1, 0, 0.2), beta = 2.88 + rnorm(1, 0, 0.2), 
-       sigma = runif(1, 0, 5), w = rexp(N, runif(N, 0, 4)))
-}
-params <- c("alpha", "beta", "sigma")
-stan_fit <- stan(model_code = scode, data = within(data_set, N <- N), 
-                 iter = 5000, verbose = FALSE,
-                 pars = params)
-print(stan_fit)
+# shinystan::launch_shinystan(qfit0)
 ```
 
 
 
+```{r O3, eval = TRUE}
+for (i in 1:9){
+  load(paste0("fit/fit0", i,".Rdata"))
+  print("########################################")
+  print("########################################")
+  print(paste0("Quantile = ", i*0.1))
+  print(summary(qfit0), digits = 3)
+}
+```
 

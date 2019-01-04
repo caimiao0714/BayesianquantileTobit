@@ -5,15 +5,15 @@
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "1607967289",
+    "hash" : "1960413062",
     "id" : "99933743",
-    "lastKnownWriteTime" : 1545874960,
-    "last_content_update" : 1545874960928,
+    "lastKnownWriteTime" : 1546617160,
+    "last_content_update" : 1546617160510,
     "path" : "C:/Users/miaocai/Dropbox/BayesianquantileTobit/Bayesian Quantile Tobit regression in Stan.Rmd",
     "project_path" : "Bayesian Quantile Tobit regression in Stan.Rmd",
     "properties" : {
-        "cursorPosition" : "107,0",
-        "scrollLine" : "79"
+        "cursorPosition" : "142,0",
+        "scrollLine" : "128"
     },
     "read_only" : false,
     "read_only_alternatives" : [

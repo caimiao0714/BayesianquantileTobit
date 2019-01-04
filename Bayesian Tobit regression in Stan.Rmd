@@ -15,15 +15,508 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval =FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval =FALSE, cache = TRUE)
 ```
 
+You need the following packages to run this Rmarkdown file:
 
+- `tidyverse`
+- `rstan`
+- `brms`
+- `shinystan`
+
+# Overview
 
 $$TE = \mathbf{X^{\prime}\beta} + \epsilon \\
 \epsilon \sim N(0, \sigma^2)$$
 
-```{r tobitstan}
+The outcome variable is Technical efficiency (TE). It is assumed to be right-censored at 1. I didn't assume it to be interval-censored since the minimum TE value in your data is more than 0, so no data is left-censored although it could be left-censored theoretically.
+
+The explanatory variables are:
+
+1. bed, 
+2. occ, 
+3. alos, 
+4. dnr, 
+5. bnr, 
+6. oir, 
+7. pop, 
+8. urban, 
+9. HHI_beds, 
+10. gdp
+
+```{r DATA}
+library(brms)
+library(tidyverse)
+library(shinystan)
+
+dat = haven::read_dta("data/dat.dta")
+
+dat$censoring = 0
+dat$censoring[dat$TE == 1] = 1
+
+dat1 = dat %>% 
+  select(year, id, TE, censoring, bed, occ, alos, dnr, bnr, oir, pop, urban, HHI_beds, gdp) %>% 
+  mutate_all(as.numeric)
+
+isFALSE <- function (x) identical(FALSE, x)
+```
+
+# Bayesian Tobit regression
+
+## Fixed-effects Bayesian Tobit regression
+
+```{r tobit}
+fit1 = brm(
+  TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp, 
+  family = gaussian, data = dat1, 
+  inits = "0", seed = 666, cores = 4,
+  chains = 4, iter = 4000, warmup = 2000)
+
+summary(fit1)
+save(fit1, file = "fit/fit1.Rdata")
+# You can get a matrix of fixef effects coefficients by: 
+# fixef(fit1)
+readr::write_csv(fixef(fit1), "fit/Fixed-effects Bayesian Tobit regression.csv")
+
+# shinystan::launch_shinystan(fit1)
+```
+
+## Bayesian Tobit regression with hospital and year random effects
+
+```{r tobitrandom}
+fit2 = brm(
+  TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), 
+  family = gaussian, data = dat1, 
+  inits = "0", seed = 666, cores = 4,
+  chains = 4, iter = 4000, warmup = 2000
+)
+
+summary(fit2)
+save(fit2, file = "fit/fit2.Rdata")
+readr::write_csv(fixef(fit2), "fit/Bayesian Tobit random effects.csv")
+```
+
+A few notes:
+
+- If you want to study the underlying `Stan` codes, you can access them by `stancode(fit2)`.
+- If you want to access the priors for this model, you can get them by `get_prior(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), family = gaussian, 
+  data = dat1)`
+- You can use `shinystan::launch_shinystan(fit2)` to explore the posterior  estimates.
+
+
+
+
+# Bayesian quantile Tobit regression
+
+```{r quantiletobit}
+qfit0 = brm(
+  bf(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), quantile = 0.2), 
+  family = asym_laplace(), data = dat1, 
+  inits = "0", seed = 666, control = list(max_treedepth = 15), 
+  chains = 1, iter = 4000, warmup = 2000
+)
+
+save(qfit0, file = "fit/qfit0.Rdata")
+readr::write_csv(fixef(qfit0), "fit/Bayesian Quantile Tobit random effects02.csv")
+
+summary(qfit0)
+
+# You can get a matrix of fixef effects coefficients by: 
+# fixef(qfit0)
+
+# shinystan::launch_shinystan(qfit0)
+```
+
+
+
+
+
+
+```{r}
+for (i in 1:10) {
+  zz = data.frame(x = 0.1*i)
+  
+  save(assign(paste0("zz", i), zz), file = paste0("fit/quantiletobit", i*0.1, ".Rdata"))
+  readr::write_csv(zz, file = file = paste0("fit/quantiletobit", i*0.1, ".csv"))
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r ARCHIVEDtobitstan, eval=FALSE, echo = FALSE}
+# DON'T RUN THIS CHUNK!!
 tobitstan = '
 data {
   int<lower=0>  N0;        
@@ -88,10 +581,7 @@ model{
   sigma ~ gamma(1, 1);
 }
 '
-```
 
-
-```{r tobitstan}
 library(rstan)
 options(mc.cores = parallel::detectCores())
 
@@ -128,82 +618,9 @@ tdat1 = list(
   gdp1 = scale1(datC$gdp)
 )
 
-rats_fit <- stan(model_code=tobitstan, model_name="Bayesian Tobit", data=tdat1, iter=5000,warmup = 2500, chains=1, seed = 111, control = list(adapt_delta = 0.99))
+# UNCOMMENT THE FOLLOWING LINE TO RUN
+#rats_fit <- stan(model_code=tobitstan, model_name="Bayesian Tobit", data=tdat1, iter=5000,warmup = 2500, chains=1, seed = 111) # You need to RESCALE back the parameters since I have scale the data 
 
 rstan::summary(rats_fit)
 shinystan::launch_shinystan(rats_fit)
 ```
-
-```{r brms}
-library(brms)
-library(tidyverse)
-dat = haven::read_dta("data/dat.dta")
-dat$censoring = 0
-dat$censoring[dat$TE == 1] = 1
-
-dat1 = dat %>% 
-  select(TE, censoring, bed, occ, alos, dnr, bnr, oir, pop, urban, HHI_beds, gdp) %>% 
-  mutate_all(as.numeric)
-  
-
-fit1 = brm(bf(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp), data = dat1, chains = 1)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
