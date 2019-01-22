@@ -79,7 +79,7 @@ save(fit1, file = "fit/fit1.Rdata")
 # fixef(fit1)
 readr::write_csv(data.frame(fixef(fit1)), "fit/Fixed-effects Bayesian Tobit regression.csv")
 
-# shinystan::launch_shinystan(fit1)
+## shinystan::launch_shinystan(fit1)
 ```
 
 ## Bayesian Tobit regression with hospital and year random effects
