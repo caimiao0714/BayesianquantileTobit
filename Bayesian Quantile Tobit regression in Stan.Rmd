@@ -15,7 +15,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```
 
 You need the following packages to run this Rmarkdown file:
@@ -50,13 +50,13 @@ library(brms)
 library(dplyr)
 library(shinystan)
 
-dat = readr::read_csv("data/dat.csv")
+load("data/dat.Rdata")
 
 dat$censoring = 0
-dat$censoring[dat$TE == 1] = 1
+dat$censoring[dat$TE_Q == 1] = 1
 
 dat1 = dat %>% 
-  select(year, id, TE, censoring, bed, occ, alos, dnr, bnr, oir, pop, urban, HHI_beds, gdp) %>% 
+  select(TE_Q, censoring, occ, bed, alos, dnr, bnr, oir, mc, pop, urban, gdp, bed1000, HHI_beds, year, id) %>% 
   mutate_all(as.numeric)
 
 isFALSE <- function (x) identical(FALSE, x)
@@ -66,7 +66,7 @@ isFALSE <- function (x) identical(FALSE, x)
 
 ## Fixed-effects Bayesian Tobit regression
 
-```{r tobit}
+```{r tobit, eval = FALSE}
 fit1 = brm(
   TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp, 
   family = gaussian, data = dat1, 
@@ -74,7 +74,7 @@ fit1 = brm(
   chains = 4, iter = 5000, warmup = 2000)
 
 summary(fit1)
-save(fit1, file = "fit/Fixed-effects Bayesian Tobit regression.Rdata")
+save(fit1, file = "fit/fit1.Rdata")
 # You can get a matrix of fixef effects coefficients by: 
 # fixef(fit1)
 readr::write_csv(data.frame(fixef(fit1)), "fit/Fixed-effects Bayesian Tobit regression.csv")
@@ -82,15 +82,9 @@ readr::write_csv(data.frame(fixef(fit1)), "fit/Fixed-effects Bayesian Tobit regr
 # shinystan::launch_shinystan(fit1)
 ```
 
-```{r o1, eval=TRUE}
-load("fit/Fixed-effects Bayesian Tobit regression.Rdata")
-print(summary(fit1), digits = 3)
-```
-
-
 ## Bayesian Tobit regression with hospital and year random effects
 
-```{r tobitrandom}
+```{r tobitrandom, eval = FALSE}
 fit2 = brm(
   TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), 
   family = gaussian, data = dat1, 
@@ -99,14 +93,10 @@ fit2 = brm(
 )
 
 summary(fit2)
-save(fit2, file = "fit/Random-effects Bayesian Tobit.Rdata")
-readr::write_csv(data.frame(fixef(fit2)), "fit/Random-effects Bayesian Tobit.csv")
+save(fit2, file = "fit/fit2.Rdata")
+readr::write_csv(data.frame(fixef(fit2)), "fit/Random-effects Bayesian Tobit .csv")
 ```
 
-```{r o2, eval=TRUE}
-load("fit/Random-effects Bayesian Tobit.Rdata")
-print(summary(fit2), digits = 3)
-```
 
 
 
@@ -121,18 +111,21 @@ A few notes:
 # Bayesian quantile Tobit regression
 
 ```{r quantiletobit}
-# the following code took OVERNIGHT to run!!
+
 for (i in 1:9) {
   qfit0 = brm(
-  bf(TE|cens(censoring) ~ bed + occ + alos + dnr + bnr + oir + pop + urban + HHI_beds + gdp + (1|id) + (1|year), quantile = 0.1*i), 
+  bf(TE_Q|cens(censoring) ~ occ + bed + alos + dnr + bnr + oir + mc + pop + urban + gdp + bed1000 + HHI_beds + (1|id) + (1|year), quantile = 0.1*i), 
   family = asym_laplace(), data = dat1, 
   inits = "0", seed = 666, control = list(max_treedepth = 15), 
-  chains = 1, iter = 4000, warmup = 2000, cores = 4
+  chains = 4, iter = 5000, warmup = 2000, cores = 4
 )
   summary(qfit0)
   save(qfit0, file = paste0("fit/fit0", i,".Rdata"))
   readr::write_csv(data.frame(fixef(qfit0)), paste0("fit/fit0", i,".csv"))
 }
+
+
+
 
 # You can get a matrix of fixef effects coefficients by: 
 # fixef(qfit0)
@@ -141,14 +134,4 @@ for (i in 1:9) {
 ```
 
 
-
-```{r O3, eval = TRUE}
-for (i in 1:9){
-  load(paste0("fit/fit0", i,".Rdata"))
-  print("########################################")
-  print("########################################")
-  print(paste0("Quantile = ", i*0.1))
-  print(summary(qfit0), digits = 3)
-}
-```
 
